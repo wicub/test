@@ -1,0 +1,741 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="zh-CN"><head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=EmulateIE7">
+    <title>内部管理系统-YOWU</title>
+    <link rel="stylesheet" type="text/css" href="%E5%86%85%E9%83%A8%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F-YOWU_files/main.css">
+    <script type="text/javascript" src="%E5%86%85%E9%83%A8%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F-YOWU_files/jquery_002.js"></script>
+    <script type="text/javascript" src="%E5%86%85%E9%83%A8%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F-YOWU_files/jquery.js"></script>
+    <script type="text/javascript" src="%E5%86%85%E9%83%A8%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F-YOWU_files/common.js"></script>
+    <script type="text/javascript" src="%E5%86%85%E9%83%A8%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F-YOWU_files/drag.js"></script>
+    <script type="text/javascript" src="%E5%86%85%E9%83%A8%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F-YOWU_files/active.js"></script>
+    <script type="text/javascript">
+    var _url = "/Product";
+	var	_app = "";
+	var _action = "/Product/editProduct";
+	var	_public = "/Public";
+	var	_self = "/Product/editProduct";
+	var	_tpl = "/Tpl/default/Public" ;
+    //var _printUrl = 'http://192.168.1.167:9000/print.php?str=';
+    var _printUrl = 'http://127.0.0.1:9000/print.php?str=';
+
+
+    function _msgalertshow(){
+        if($('#_msg_mask').attr('id') != undefined) return;
+        var mask = $('<div class="mask" id="_msg_mask" style="z-index:9000;"></div>');
+        var act_box = $('<div id="_msg_act_box" class="ac_box rack_case01" style="width:450px;min-height:60px;z-index:9001;"><div class="ac_content" style="padding:20px;"><div class="goods_edit">正在读取数据，请稍候......</div></div></div>');
+        $('body').append(mask);
+        $('body').append(act_box);
+        var maskHeight = $(document).height();
+        var maskWidth = $(window).width();
+        var relLeft = ($(window).width() - $("#_msg_act_box").width())/2;
+        var relTop = ($(window).height() - $("#_msg_act_box").height())/2;
+        $('#_msg_mask').css({height:maskHeight, width:maskWidth}).show();
+        $("#_msg_act_box").css({top:$(window).scrollTop() + relTop + 'px', left:$(window).scrollLeft() + relLeft + 'px'}).show();
+    }
+    function _msgalerthide(){
+        $('#_msg_mask').remove();
+        $('#_msg_act_box').remove();
+    }
+    function msgBoxText(msg, goTime, fun){
+        if($('#_msg_mask').attr('id') == undefined){
+            _msgalertshow();
+        }
+        msg = '<font color="red"><b>' + msg + '</b></font>';
+        $("#_msg_act_box .goods_edit").html('&nbsp;&nbsp;&nbsp;' + msg + '&nbsp;&nbsp;&nbsp;<span id="_msg_timer">' + goTime + '</span>秒后恢复');
+        $('#_msg_timer').everyTime('1s','B',function(){
+            t1 = parseInt($(this).html());
+            t1--;
+            $(this).html(t1);
+            if (t1 == 0){
+                _msgalerthide();
+                if(typeof(fun) == 'function'){
+                    fun();
+                }
+            }
+        },goTime);
+    }
+
+    function delCache() {
+        $.get('/Public/clearMemcached','',function(ret){
+            alert('清除成功！');
+        });
+    }
+
+    function delStaticHtml(){
+        $.get('/Public/delStaticHtml','',function(ret){
+            alert('清除成功！');
+        });
+    }
+
+    function changPasswd(){
+            var Post = {
+                oldPasswd : $.trim($('#oldPasswd').val()),
+                newPasswd : $.trim($('#newPasswd').val()),
+                repPasswd : $.trim($('#repPasswd').val())
+            }
+            if(Post.newPasswd != Post.repPasswd){
+                alert('两次密码输入不一致！');
+                return false;
+            }
+
+            if(Post.newPasswd.length < 8){
+                 alert("密码长度必须大于等于8位");
+                 return false;
+             }
+
+            var reg5 = /^[A-Za-z].*[0-9]|[0-9].*[A-Za-z]+$/;
+	         if(!reg5.test(Post.newPasswd)){
+	             alert("密码只能由英文和数字组成");
+	             return false;
+	         }
+
+
+            $.post('/Public/changPsd', Post, function(ret){
+                if(ret == -1){
+                    msgBoxText('<font color="red">当前密码输入不正确！</font>', 2,null);
+                }
+                else if(ret == 0){
+                    msgBoxText('<font color="red">密码修改失败！</font>', 2,null);
+                }
+                else if(ret == 1){
+                    /*msgBoxText('密码修改成功！', 1);*/
+                    msgBoxText('密码修改成功! ', 1,function(){ location.reload(); });
+                }
+                else{
+                    msgBoxText('发生未知错误！', 2,null);
+                }
+            });
+        }
+
+	$(function(){
+		try {
+            var winWidth = $(window).width();
+            var def = $("#topnav li.active-item .sub_nav")
+            var defoffset = def.offset()
+            var defmain = def.width() + defoffset.left
+            if(defmain > winWidth){
+                def.css({left:winWidth - defmain +"px"})
+            }
+        }catch (e){
+
+        }
+	})
+    </script>
+<link type="text/css" rel="stylesheet" href="%E5%86%85%E9%83%A8%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F-YOWU_files/WdatePicker.css"></head>
+
+<body><div class="mask"></div>
+<div id="bc123" class="ac_box rack_case01">
+	<div class="relative">
+        <div class="absolute"><a class="close_btn" href="javascript:void(0);"><img src="%E5%86%85%E9%83%A8%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F-YOWU_files/pic_close_btn.gif"></a></div>
+    </div>
+    <h3>
+        <span class="float_l">修改密码</span>
+    </h3>
+    <div class="ac_content">
+        <div class="ac_content">
+            <div class="add_rack">
+                <table class="table2_td align_l" width="100%">
+                    <tbody><tr>
+                        <th>当前密码：</th><td><input class="input_nom" id="oldPasswd" name="oldPasswd" type="password"></td>
+                    </tr>
+                    <tr>
+                        <th>新的密码：</th><td><input class="input_nom" id="newPasswd" name="newPasswd" type="password"></td>
+                    </tr>
+                    <tr>
+                        <th>重复密码：</th><td><input class="input_nom" id="repPasswd" name="repPasswd" type="password"></td>
+                    </tr>
+                </tbody></table>
+                <p><button onclick="changPasswd()">确认</button></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!--头部开始-->
+<div id="header" class="container">
+    <div class="logo">
+        <span class="float_l">YOWU</span>
+        <p class="float_l">YOWU INTERNAL SYSTEM V2.0</p>
+    </div>
+    <div class="login_info">
+        <p>你好，<span class="c_purple">admin</span> <span>(管理员)</span><i>|</i><a cval="c123" class="btn_drag" href="javascript:void(0);">修改密码</a><i>|</i><a href="javascript:void(0);" onclick="delCache()">清除缓存</a><i>|</i><a href="javascript:void(0);" onclick="delStaticHtml()">清除首页缓存</a><i>|</i><a href="http://admin.jia/Index">回到首页</a><i>|</i><a class="link_purple" href="http://admin.jia/Public/logout">登出</a></p>
+    </div>
+</div>
+<!--头部结束-->
+
+
+<!--导航开始-->
+<div id="nav">
+
+    <!--主导航-->
+    <ul id="topnav" class="main_nav">
+        <li><a class="n_t" href="http://admin.jia/Index/index">首页</a><span class="sub_nav"></span></li>
+        <li class="active-item"><div class="n_t">商品管理</div><span class="sub_nav span_longer" style="display: inline;"><a href="http://admin.jia/Product/manageIndex">商品管理页面</a><a href="http://admin.jia/Brand/brandList">品牌管理页面</a></span></li><li><div class="n_t">订单管理</div><span class="sub_nav span_longer"><a href="http://admin.jia/Order/addNewOrder">新建订单页面</a><a href="http://admin.jia/Order/myOrderLst">我的订单页面</a><a href="http://admin.jia/Order/allOrderLst">订单查询页面</a><a href="http://admin.jia/Order/leaveStockOrderLst">出库/发货管理页面</a><a href="http://admin.jia/Order/fastOrderIndex">快速下单页面</a><a href="http://admin.jia/Reject/rejectLst">退货管理页面</a></span></li><li><div class="n_t">会员管理</div><span class="sub_nav"><a href="http://admin.jia/Member/memberList">会员列表</a></span></li><li><div class="n_t">仓库管理</div><span class="sub_nav"><a href="http://admin.jia/Warehouse/rackList">货架管理页面</a><a href="http://admin.jia/Stock/stockEnterIndex">入库管理页面</a><a href="http://admin.jia/Stock/stockLeaveIndex">出库管理页面</a><a href="http://admin.jia/Stock/deliverySearch">出库发货查询页面</a><a href="http://admin.jia/Stock/returnDealersIndex">代销商品返还页面</a></span></li><li><div class="n_t">合作商管理</div><span class="sub_nav"><a href="http://admin.jia/Consignment/supplierLstIndex">代销供应商列表页面</a><a href="http://admin.jia/Consignment/allocation">调拨管理页面</a></span></li><li><div class="n_t">活动管理</div><span class="sub_nav"><a href="http://admin.jia/Coupon/couponList">优惠券规则列表页面</a><a href="http://admin.jia/Coupon/selectCoupon">优惠卷查询页面</a></span></li><li><div class="n_t">财务管理</div><span class="sub_nav"><a href="http://admin.jia/Finance/financeOrderMessage">订单收付页面</a><a href="http://admin.jia/Finance/financeInvoiceMessage">发票管理页面</a><a href="http://admin.jia/Finance/financeSupplierMessage">代销结算相关页面</a></span></li><li><div class="n_t">报表管理</div><span class="sub_nav span_longer"><a href="http://admin.jia/Report/membersReport">会员报表</a></span></li><li><div class="n_t">权限管理</div><span class="sub_nav span_shorter"><a href="http://admin.jia/Access/userList">用户列表</a><a href="http://admin.jia/Access/groupList">组管理</a><a href="http://admin.jia/Access/accessList">权限管理</a></span></li><li><div class="n_t">系统设置</div><span class="sub_nav span_shorter"><a href="http://admin.jia/Cms/adIndex">bananer设置页面</a><a href="http://admin.jia/Cms/mediaReportList">媒体列表页面</a></span></li>
+
+    </ul>
+</div>
+<script type="text/javascript" src="%E5%86%85%E9%83%A8%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F-YOWU_files/verify.js"></script>
+<script type="text/javascript" src="%E5%86%85%E9%83%A8%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F-YOWU_files/WdatePicker.js"></script>
+<script type="text/javascript" src="%E5%86%85%E9%83%A8%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F-YOWU_files/product.js"></script>
+
+
+<div id="content" class="container">
+    <div class="con_title clearfix">
+        <b class="float_l">新增商品</b>
+        <span class="float_l" onclick="boxShow('bc02')" style="cursor:pointer; color:#8e0c3a;">（录入选项介绍）</span>
+    </div>
+    <div class="con_cont clearfix">
+		<div style="display: none;" class="step1"><img src="%E5%86%85%E9%83%A8%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F-YOWU_files/l01.gif"></div>
+		<div class="step2" style=""><img src="%E5%86%85%E9%83%A8%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F-YOWU_files/l02.gif"></div>
+    </div>
+	<div style="display: none;" class="step1">
+    	<div style="border:1px solid #ccc;">
+        <div style="padding-left:20px;">
+            <table class="table2_td align_l" width="100%">
+                <tbody><tr>
+                    <th>*原厂货号：</th><td><input value="poieccec5" id="item_number" type="text"></td>
+                </tr>
+                <tr>
+                    <th>商家自编号：</th><td><input value="12344" id="product_code" type="text"></td>
+                </tr>
+                <tr>
+                    <th>*销售价格：</th><td><input value="1234" id="price" type="text"></td>
+                </tr>
+                <tr>
+                    <th>*商家：</th>
+                    <td>
+                        <select id="supplier_id" name="" onchange="getTheBrand(this.value);" ondblclick="" class="pri_select" datatype="" errmsg=""><option value="">-请选择-</option><option selected="selected" value="48">ALTER</option><option value="47">BY</option><option value="49">Chic St.</option><option value="46">Le Lutin</option><option value="61">OOAK</option><option value="57">Shine</option><option value="56">The Villa</option><option value="45">TIPS</option><option value="51">丝头爱染色S.T.A.R.S.</option></select>
+                    </td>
+                </tr>
+                <tr>
+                    <th>*商品品牌：</th>
+                    <td id="n_brands">
+                        <select id="brand_id" name="" onchange="" ondblclick="" class="pri_select" datatype="" errmsg=""><option value="">-请选择-</option><option selected="selected" value="35">Moncler</option><option value="96">10 Crosby Derek Lam</option><option value="97">Altuzarra</option><option value="98">Eddie Borgo</option><option value="99">Ground-Zero</option><option value="100">Linda Farrow</option><option value="101">Preen</option><option value="102">Silent by Damir Doma</option><option value="103">Damir Doma</option><option value="104">Lauren Moshi</option><option value="105">Wildfox Couture</option><option value="106">THATCHER by Alisse Thatcher</option><option value="107">Thea Grant</option><option value="110">Erickson Beamon</option><option value="112">Lad Musician</option><option value="115">Kokon To Zai</option><option value="118">Alexis Mabille</option><option value="119">Jeremy Scott</option><option value="120">By Kilian</option><option value="121">Delfina Delettrez</option><option value="125">Tibi</option><option value="126">Rag &amp; Bone</option><option value="127">Elizabeth and James</option><option value="128">Iosselliani</option><option value="130">TATA baby</option><option value="131">Ancient Greek Sandals</option><option value="132">Neil Barrett</option><option value="133">Ethosens</option><option value="134">Mihara Yasuhiro</option><option value="136">Gareth Pugh</option><option value="137">Martinez Lierah</option><option value="138">Limi Feu</option><option value="139">Mina Perhonen</option><option value="140">TOGA Pulla</option><option value="141">Undercover</option><option value="142">Y's</option><option value="143">COMME des GARCONS</option><option value="144">Antipodium</option><option value="145">EA Burns</option><option value="146">Origami Jewellery</option><option value="147">Alex Monroe</option><option value="148">House of Holland</option><option value="149">Daniel Palillo</option><option value="150">202 FACTORY</option><option value="151">ANDREW McDONALD</option></select>
+                    </td>
+                </tr>
+                <tr>
+                    <th>*商品分类：</th>
+                    <td>
+                        <select id="category_id" name="" onchange="changeCate(this.value);" ondblclick="" class="pri_select" datatype="" errmsg=""><option value="">-请选择-</option><option value="1">包袋</option><option selected="selected" value="3">配饰</option><option value="8">鞋履</option><option value="24">服装</option></select>
+						<select id="secondCate" onchange="changeSecondCate(this.value);"><option value="">-请选择-</option><option selected="selected" value="2">钱包</option><option value="4">饰品</option><option value="5">眼镜</option><option value="6">腰带</option><option value="7">帽子&amp;手套</option><option value="17">钥匙包</option><option value="28">小配件</option><option value="29">数码周边</option><option value="107">手表</option><option value="108">文具</option><option value="143">家居</option><option value="180">领带</option><option value="181">围巾</option><option value="188">卡夹</option><option value="192">伞具</option></select>
+						<span id="subCate"><input checked="checked" class="checkbox" id="ck_124" value="124" onclick="getJiesuan(124);" type="checkbox"><span class="lable"><label for="ck_124">短钱包</label></span><input class="checkbox" id="ck_125" value="125" onclick="getJiesuan(125);" type="checkbox"><span class="lable"><label for="ck_125">长钱包</label></span><input class="checkbox" id="ck_126" value="126" onclick="getJiesuan(126);" type="checkbox"><span class="lable"><label for="ck_126">零钱袋</label></span><input class="checkbox" id="ck_140" value="140" onclick="getJiesuan(140);" type="checkbox"><span class="lable"><label for="ck_140">票夹</label></span><input class="checkbox" id="ck_141" value="141" onclick="getJiesuan(141);" type="checkbox"><span class="lable"><label for="ck_141">护照夹</label></span></span>
+                    </td>
+                </tr>
+                <tr id="jiesuan" style="display:none;">
+                    <th>*结算分类：</th>
+					<td>
+						<div id="subJiesuan"><input checked="checked" class="radio" id="rd_124" name="jiesuan" value="124" onclick="getJiesuan(124);" type="radio"><span class="lable"><label for="rd_124">短钱包</label></span><input class="radio" id="rd_125" name="jiesuan" value="125" onclick="getJiesuan(125);" type="radio"><span class="lable"><label for="rd_125">长钱包</label></span><input class="radio" id="rd_126" name="jiesuan" value="126" onclick="getJiesuan(126);" type="radio"><span class="lable"><label for="rd_126">零钱袋</label></span><input class="radio" id="rd_140" name="jiesuan" value="140" onclick="getJiesuan(140);" type="radio"><span class="lable"><label for="rd_140">票夹</label></span><input class="radio" id="rd_141" name="jiesuan" value="141" onclick="getJiesuan(141);" type="radio"><span class="lable"><label for="rd_141">护照夹</label></span></div>
+					</td>
+                </tr>
+                <tr>
+                    <th>*商品颜色：</th>
+					<td>
+						<select id="color" name="" onchange="" ondblclick="" class="pri_select" datatype="" errmsg=""><option value="">-请选择-</option><option selected="selected" value="01">黑色</option><option value="02">白色</option><option value="10">棕色</option><option value="04">红色</option><option value="05">蓝色</option><option value="06">绿色</option><option value="11">橘色</option><option value="03">粉色</option><option value="12">紫色</option><option value="08">金色</option><option value="09">银色</option><option value="07">灰色</option><option value="14">米色</option><option value="13">黄色</option><option value="21">经典</option><option value="22">动物花纹</option><option value="20">多色</option></select>
+					</td>
+                </tr>
+                <tr>
+                    <th>*适用性别：</th>
+					<td>
+						<select id="fit_person" name="" onchange="" ondblclick="" class="pri_select" datatype="" errmsg=""><option value="">-请选择-</option><option selected="selected" value="00">所有</option><option value="10">男女</option><option value="20">男士</option><option value="30">女士</option></select>
+					</td>
+                </tr>
+                <tr>
+                    <th style=" vertical-align:top; padding-top:5px;">*尺码数量：</th>
+					<td>
+						<div id="setMeasure" style="width:300px;"><table class="table2_td align_l" id="n_tb" width="100%">
+	<tbody><tr>
+		<th style=" text-align:center;" width="40%">尺码</th>
+		<th style=" text-align:left;" width="40%">数量</th>
+		<th width="20%"></th>
+	</tr>
+	<tr>
+		<td colspan="5" class="quantity-zone">
+			<div id="n_quantitys">
+				<div class="float_l num-div" style="width:150px; padding-left:20px;">
+					<input value="" type="hidden">
+					<input style="width:40px;" maxlength="5" value="1" type="text">
+					<span><select class="search_size" style="display:none;"><option value="" selected="selected"></option></select></span>
+					<span>X</span>
+					<input style="width:40px;" maxlength="5" value="1" type="text">
+					<span onclick="delSize(this)" title="删除尺寸" class="sp_fun" style="padding-left:5px;">
+						<img style="vertical-align:middle;" src="%E5%86%85%E9%83%A8%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F-YOWU_files/pic_un_add.gif">
+					</span>
+				</div>
+				<div class="float_l" style="margin-top:5px; line-height: 12px;">
+					<span onclick="addSize(this)" title="增加尺寸" class="sp_fun">
+						<img src="%E5%86%85%E9%83%A8%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F-YOWU_files/pic_add.gif">
+					</span>
+				</div>
+				<div class="hackbox"></div>
+			</div>
+		</td>
+	</tr>
+</tbody></table><div id="think_run_time" class="think_run_time">Process:
+ 0.107s ( Load:0.005s Init:0.009s Exec:0.093s Template:0.000s ) | DB :16
+ queries 0 writes  | Cache :0 gets 0 writes  | UseMem:2,662 kb</div><div id="think_page_trace" style="background:white;margin:6px;font-size:14px;border:1px dashed silver;padding:8px">
+<fieldset id="querybox" style="margin:5px;">
+<legend style="color:gray;font-weight:bold">页面Trace信息</legend>
+<div style="overflow:auto;height:300px;text-align:left;">
+当前页面 : /Product/editMeasures?category_id=3<br>模板缓存 : ./Runtime/Cache/0eaaf3759a26f6563022fae6a3be9f80.php<br>请求方法 : GET<br>通信协议 : HTTP/1.1<br>请求时间 : 2013-10-15 16:29:14<br>用户代理 : Mozilla/5.0 (Windows NT 6.1; rv:23.0) Gecko/20100101 Firefox/23.0<br>会话ID : b5d4f9eeac05de2371d689993af405b6<br>日志记录 : 17条日志<br>[ 2013-10-15T16:29:14+08:00 ] SQL: SHOW COLUMNS FROM product_info [ RunTime:0.004006s ]
+<br>[ 2013-10-15T16:29:14+08:00 ] SQL: SHOW COLUMNS FROM product_sales [ RunTime:0.003701s ]
+<br>[ 2013-10-15T16:29:14+08:00 ] SQL: SHOW COLUMNS FROM product_quantity [ RunTime:0.002473s ]
+<br>[ 2013-10-15T16:29:14+08:00 ] SQL: SHOW COLUMNS FROM product_category [ RunTime:0.002161s ]
+<br>[ 2013-10-15T16:29:14+08:00 ] SQL: SHOW COLUMNS FROM product_goods [ RunTime:0.002377s ]
+<br>[ 2013-10-15T16:29:14+08:00 ] SQL: SHOW COLUMNS FROM product_schedule [ RunTime:0.002150s ]
+<br>[ 2013-10-15T16:29:14+08:00 ] SQL: SHOW COLUMNS FROM product_schedule_goods [ RunTime:0.002002s ]
+<br>[ 2013-10-15T16:29:14+08:00 ] SQL: SHOW COLUMNS FROM dd_product_style [ RunTime:0.002193s ]
+<br>[ 2013-10-15T16:29:14+08:00 ] SQL: SHOW COLUMNS FROM product [ RunTime:0.002036s ]
+<br>[ 2013-10-15T16:29:14+08:00 ] SQL: SHOW COLUMNS FROM songpai [ RunTime:0.002918s ]
+<br>[ 2013-10-15T16:29:14+08:00 ] SQL: SHOW COLUMNS FROM songpai_product [ RunTime:0.002344s ]
+<br>[ 2013-10-15T16:29:14+08:00 ] SQL: SHOW COLUMNS FROM songpai_remark [ RunTime:0.002553s ]
+<br>[ 2013-10-15T16:29:14+08:00 ] SQL: SHOW COLUMNS FROM songpai [ RunTime:0.002409s ]
+<br>[ 2013-10-15T16:29:14+08:00 ] SQL: SHOW COLUMNS FROM purchase_detail [ RunTime:0.011516s ]
+<br>[ 2013-10-15T16:29:14+08:00 ] SQL: SHOW COLUMNS FROM arrival_notice [ RunTime:0.002537s ]
+<br>[ 2013-10-15T16:29:14+08:00 ] SQL: SHOW COLUMNS FROM meici [ RunTime:0.002764s ]
+<br>[ 2013-10-15T16:29:14+08:00 ] NOTIC: [8] Undefined variable: data 0eaaf3759a26f6563022fae6a3be9f80.php 第 66 行.
+<br>加载文件 : 25<br>    [0] =&gt; E:\xampp\htdocs\company\yowuadmin\index.php<br>    [1] =&gt; E:\xampp\htdocs\company\yowuadmin\define.inc.php<br>    [2] =&gt; E:\xampp\htdocs\company\ThinkPHP2\ThinkPHP.php<br>    [3] =&gt; E:\xampp\htdocs\company\yowuadmin\Runtime\~runtime.php<br>    [4] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Common\convention.php<br>    [5] =&gt; E:\xampp\htdocs\company\yowuadmin\Conf\config.php<br>    [6] =&gt; E:\xampp\htdocs\company\yowuadmin\Common\common.php<br>    [7] =&gt; E:\xampp\htdocs\company\baseYowu\Common\common.php<br>    [8] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Common\debug.php<br>    [9] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Util\Dispatcher.class.php<br>    [10] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lang\zh-cn.php<br>    [11] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Util\HtmlCache.class.php<br>    [12] =&gt; E:\xampp\htdocs\company\yowuadmin\Lib\Action\ProductAction.class.php<br>    [13] =&gt; E:\xampp\htdocs\company\yowuadmin\Lib\Action\BaseAction.class.php<br>    [14] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Util\Cache.class.php<br>    [15] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Util\Cache\CacheMemcache.class.php<br>    [16] =&gt; E:\xampp\htdocs\company\yowuadmin\Lib\ORG\RBAC.class.php<br>    [17] =&gt; E:\xampp\htdocs\company\yowuadmin\Lib\Model\ProductModel.class.php<br>    [18] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Core\Model.class.php<br>    [19] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Db\Db.class.php<br>    [20] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Db\Driver\DbMysql.class.php<br>    [21] =&gt; E:\xampp\htdocs\company\yowuadmin\Lib\Model\SongpaiModel.class.php<br>    [22] =&gt; E:\xampp\htdocs\company\yowuadmin\Lib\Model\MeiciModel.class.php<br>    [23] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Core\Model\AdvModel.class.php<br>    [24] =&gt; E:\xampp\htdocs\company\yowuadmin\Runtime\Cache\0eaaf3759a26f6563022fae6a3be9f80.php<br><br></div>
+</fieldset>
+</div></div>						
+					</td>
+                </tr>
+                <tr>
+					<td colspan="2">
+						
+					</td>
+                </tr>
+            </tbody></table>
+        </div>
+        </div>
+	</div>
+	<div id="product_id" class="step2" style="" val="1020255"><div style="margin-bottom:30px;">
+	<div style=" border:1px #cccccc solid; width:1380px;">
+    <div style=" width:550px; padding:10px 0 10px 20px;">
+    <table class="table2_td goods_msg" style="margin-bottom:10px;" width="100%">
+        <colgroup>
+            <col width="12%"><col width="20%"><col width="10%"><col width="25%"><col width="10%"><col width="15%">
+        </colgroup>
+        <tbody><tr>
+            <th style="width:72px;">原厂货号：</th>
+            <td id="e_item_number">POIECCEC5<input id="e_product_id" value="1020255" type="hidden"></td>
+            <th>品牌：</th>
+            <td id="e_brand">Moncler 蒙口</td>
+            <th>品类：</th>
+            <td id="e_cat">配饰</td>
+        </tr>
+    </tbody></table>
+    <table class="table2_td" width="100%">
+        <tbody><tr>
+			<th>商家自编号：</th><td><input id="e_product_code" value="12344" type="text"></td>
+            <th style="width:72px;">颜色：</th>
+            <td><select id="e_color" name="e_color" onchange="" ondblclick="" class="" datatype="" errmsg=""><option value="">-请选择-</option><option selected="selected" value="01">黑色</option><option value="02">白色</option><option value="10">棕色</option><option value="04">红色</option><option value="05">蓝色</option><option value="06">绿色</option><option value="11">橘色</option><option value="03">粉色</option><option value="12">紫色</option><option value="08">金色</option><option value="09">银色</option><option value="07">灰色</option><option value="14">米色</option><option value="13">黄色</option><option value="21">经典</option><option value="22">动物花纹</option><option value="20">多色</option></select></td>
+			<th>适合人群：</th>
+			<td><select id="e_fit_person" name="e_fit_person" onchange="" ondblclick="" class="" datatype="" errmsg=""><option value="">-请选择-</option><option selected="selected" value="00">所有</option><option value="10">男女</option><option value="20">男士</option><option value="30">女士</option></select></td>
+        </tr>
+        <tr>
+            <th>尺码填写：</th>
+            <td id="measureField" colspan="5">
+        <table class="t_data_list goods_num" width="100%">
+    <colgroup>
+        <col width="9%"><col width="9%"><col width="9%"><col width="9%">    </colgroup>
+    <tbody><tr>
+        <th style="text-align:center">尺寸</th><th style="text-align:center">宽</th><th style="text-align:center">长</th><th style="text-align:center">厚</th>    </tr>
+    <tr>
+            <td><b>
+                    1                </b></td>
+            <td style="padding:0px 2px 0px 2px;margin:0">
+                    <input sizekey="189" style="width:35px;" type="text">
+                                    </td><td style="padding:0px 2px 0px 2px;margin:0">
+                    <input sizekey="190" style="width:35px;" type="text">
+                                    </td><td style="padding:0px 2px 0px 2px;margin:0">
+                    <input sizekey="191" style="width:35px;" type="text">
+                                    </td>        </tr></tbody></table>        </td>
+        </tr>
+        
+        
+       <tr id="p_name">
+            <th>系列：</th><td colspan="5"><input style="width:440px;" id="e_series" type="text"></td>
+        </tr>
+		<tr>
+            <th>颜色：</th><td colspan="5"><input style="width:440px;" id="e_color_des" type="text"></td>
+        </tr>
+		<tr>
+            <th>材质：</th><td colspan="5"><input style="width:440px;" id="e_material" type="text"></td>
+        </tr>
+		<tr>
+			 <th>细节：</th><td colspan="5"><input style="width:440px;" id="e_xijie" type="text"></td>
+		</tr>
+        <tr>
+            <th>产地：</th><td colspan="5"><input style="width:440px;" id="e_area" type="text"></td>
+        </tr>
+		
+		<tr>
+            <th>商品名称：</th><td colspan="5"><input style="width:440px;" id="e_name" type="text"></td>
+        </tr>
+		
+		<!-- <tr id="p_name">
+		            <th>商品名称：</th><td colspan="5" id='e_name'><input style="width:440px;" type="text" id="e_name" value="" /></td>
+		      </tr> -->
+		
+        <tr>
+            <th>产品内部：</th>
+            <td colspan="5">
+                <textarea cols="60" rows="3" id="e_internal"></textarea>
+            </td>
+        </tr>
+        <tr>
+            <th>产品外部：</th>
+            <td colspan="5">
+                <textarea cols="60" rows="3" id="e_external"></textarea>
+            </td>
+        </tr>
+        <tr>
+            <th style="padding:8px 0; vertical-align:top;">详细描述：</th>
+            <td colspan="5"><textarea cols="60" rows="3" id="e_memo"></textarea></td>
+        </tr>
+    </tbody></table>
+    </div>
+    </div>
+	<div style="margin-left:25px; margin-top:20px;">
+		<button onclick="return saveInfo('2');">完成</button> <button onclick="return saveInfo('1');" style=" margin-left:5px;">完成，继续添加</button>	
+	</div>
+</div>
+
+<style>
+    ._sp_div { display:inline-block;width:60px;height:80px;text-align:center; }
+    ._sp_input { display:inline-block;width:60px;text-align:center; }
+</style><div id="think_run_time" class="think_run_time">Process: 0.172s (
+ Load:0.006s Init:0.008s Exec:0.158s Template:0.000s ) | DB :31 queries 0
+ writes  | Cache :0 gets 0 writes  | UseMem:4,128 kb</div><div id="think_page_trace" style="background:white;margin:6px;font-size:14px;border:1px dashed silver;padding:8px">
+<fieldset id="querybox" style="margin:5px;">
+<legend style="color:gray;font-weight:bold">页面Trace信息</legend>
+<div style="overflow:auto;height:300px;text-align:left;">
+当前页面 : /Product/lstOneInfo?id=1020255&amp;type=3<br>模板缓存 : ./Runtime/Cache/023f9b8372c8aac0845d74e87bded32a.php<br>请求方法 : GET<br>通信协议 : HTTP/1.1<br>请求时间 : 2013-10-15 16:29:24<br>用户代理 : Mozilla/5.0 (Windows NT 6.1; rv:23.0) Gecko/20100101 Firefox/23.0<br>会话ID : b5d4f9eeac05de2371d689993af405b6<br>日志记录 : 73条日志<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SHOW COLUMNS FROM product_info [ RunTime:0.002486s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SHOW COLUMNS FROM product_sales [ RunTime:0.001802s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SHOW COLUMNS FROM product_quantity [ RunTime:0.002000s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SHOW COLUMNS FROM product_category [ RunTime:0.002312s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SHOW COLUMNS FROM product_goods [ RunTime:0.002017s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SHOW COLUMNS FROM product_schedule [ RunTime:0.001623s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SHOW COLUMNS FROM product_schedule_goods [ RunTime:0.001548s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SHOW COLUMNS FROM dd_product_style [ RunTime:0.001830s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SHOW COLUMNS FROM product [ RunTime:0.001546s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SHOW COLUMNS FROM songpai [ RunTime:0.002015s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SHOW COLUMNS FROM songpai_product [ RunTime:0.002230s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SHOW COLUMNS FROM songpai_remark [ RunTime:0.001856s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SHOW COLUMNS FROM songpai [ RunTime:0.001910s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SHOW COLUMNS FROM purchase_detail [ RunTime:0.002013s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SHOW COLUMNS FROM arrival_notice [ RunTime:0.001770s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SHOW COLUMNS FROM meici [ RunTime:0.001965s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SELECT * FROM `product_info` WHERE id=1020255 LIMIT 1  [ RunTime:0.000510s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SELECT `id` FROM `product_sales` 
+WHERE status="30" and product_id=1020255 LIMIT 1  [ RunTime:0.000485s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SELECT * FROM `purchase_detail` 
+WHERE product_id=1020255 ORDER BY id desc LIMIT 1  [ RunTime:0.000556s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SELECT pc.category_id,pc.main 
+FROM product_category pc INNER JOIN category c ON pc.category_id=c.id 
+WHERE pc.product_id=1020255 ORDER BY c.sort,c.id [ RunTime:0.000695s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SHOW COLUMNS FROM category [ RunTime:0.001868s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SELECT `fid` FROM `category` WHERE id=124 LIMIT 1  [ RunTime:0.000570s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [8] Use of undefined constant 
+list_search - assumed 'list_search' BaseAction.class.php 第 726 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SHOW COLUMNS FROM product_measure [ RunTime:0.002428s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SELECT * FROM `product_measure` WHERE product_id=1020255 [ RunTime:0.000477s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [2] Invalid argument supplied for foreach() ProductAction.class.php 第 1257 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SELECT `size` FROM 
+`product_quantity` WHERE product_id=1020255 GROUP BY size [ 
+RunTime:0.000651s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [8] Undefined variable: edit ProductAction.class.php 第 1297 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SHOW COLUMNS FROM product_style [ RunTime:0.001870s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SELECT style_id,is_recommend FROM
+ `product_style` WHERE product_id=1020255 LIMIT 1  [ RunTime:0.000470s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: select a.id 
+quantity_id,a.supplier_id,a.size,a.size_for_search,a.quantity,a.quantity_inventory,b.type
+ from product_quantity a inner join product_sales b on 
+a.product_sales_id=b.id where a.product_id=1020255 order by 
+product_sales_id,supplier_id,size [ RunTime:0.000601s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [8] Use of undefined constant 
+list_search - assumed 'list_search' ProductAction.class.php 第 662 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: SHOW COLUMNS FROM lend_form [ RunTime:0.002113s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: select sum(ld.quantity) quantity
+                from lend_detail ld
+                inner join lend_form lf on ld.lend_id=lf.id
+                where lf.status&lt;=1 and ld.product_quantity_id=24571 [ RunTime:0.000553s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] SQL: select `memo` from product_info_20121106 where id = 1020255 [ RunTime:0.000387s ]
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [8] Undefined index:  values TagLibHtml.class.php 第 149 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [8] Undefined index:  output TagLibHtml.class.php 第 150 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [8] Undefined index:  multiple TagLibHtml.class.php 第 151 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [8] Undefined index:  size TagLibHtml.class.php 第 153 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [8] Undefined index:  style TagLibHtml.class.php 第 156 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [8] Undefined index:  dblclick TagLibHtml.class.php 第 157 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [8] Undefined index:  change TagLibHtml.class.php 第 158 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [8] Undefined index:  datatype TagLibHtml.class.php 第 159 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [8] Undefined index:  errmsg TagLibHtml.class.php 第 160 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [8] Undefined index:  values TagLibHtml.class.php 第 149 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [8] Undefined index:  output TagLibHtml.class.php 第 150 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [8] Undefined index:  multiple TagLibHtml.class.php 第 151 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [8] Undefined index:  size TagLibHtml.class.php 第 153 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [8] Undefined index:  style TagLibHtml.class.php 第 156 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [8] Undefined index:  dblclick TagLibHtml.class.php 第 157 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [8] Undefined index:  change TagLibHtml.class.php 第 158 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [8] Undefined index:  datatype TagLibHtml.class.php 第 159 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [8] Undefined index:  errmsg TagLibHtml.class.php 第 160 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [2] in_array() [<a href="http://admin.jia/Product/function.in-array">function.in-array</a>]: Wrong datatype for second argument 023f9b8372c8aac0845d74e87bded32a.php 第 22 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [2] in_array() [<a href="http://admin.jia/Product/function.in-array">function.in-array</a>]: Wrong datatype for second argument 023f9b8372c8aac0845d74e87bded32a.php 第 22 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [2] in_array() [<a href="http://admin.jia/Product/function.in-array">function.in-array</a>]: Wrong datatype for second argument 023f9b8372c8aac0845d74e87bded32a.php 第 22 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [2] in_array() [<a href="http://admin.jia/Product/function.in-array">function.in-array</a>]: Wrong datatype for second argument 023f9b8372c8aac0845d74e87bded32a.php 第 22 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [2] in_array() [<a href="http://admin.jia/Product/function.in-array">function.in-array</a>]: Wrong datatype for second argument 023f9b8372c8aac0845d74e87bded32a.php 第 22 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [2] in_array() [<a href="http://admin.jia/Product/function.in-array">function.in-array</a>]: Wrong datatype for second argument 023f9b8372c8aac0845d74e87bded32a.php 第 22 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [2] in_array() [<a href="http://admin.jia/Product/function.in-array">function.in-array</a>]: Wrong datatype for second argument 023f9b8372c8aac0845d74e87bded32a.php 第 22 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [2] in_array() [<a href="http://admin.jia/Product/function.in-array">function.in-array</a>]: Wrong datatype for second argument 023f9b8372c8aac0845d74e87bded32a.php 第 22 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [2] in_array() [<a href="http://admin.jia/Product/function.in-array">function.in-array</a>]: Wrong datatype for second argument 023f9b8372c8aac0845d74e87bded32a.php 第 22 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [2] in_array() [<a href="http://admin.jia/Product/function.in-array">function.in-array</a>]: Wrong datatype for second argument 023f9b8372c8aac0845d74e87bded32a.php 第 22 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [2] in_array() [<a href="http://admin.jia/Product/function.in-array">function.in-array</a>]: Wrong datatype for second argument 023f9b8372c8aac0845d74e87bded32a.php 第 22 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [2] in_array() [<a href="http://admin.jia/Product/function.in-array">function.in-array</a>]: Wrong datatype for second argument 023f9b8372c8aac0845d74e87bded32a.php 第 22 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [2] in_array() [<a href="http://admin.jia/Product/function.in-array">function.in-array</a>]: Wrong datatype for second argument 023f9b8372c8aac0845d74e87bded32a.php 第 22 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [2] in_array() [<a href="http://admin.jia/Product/function.in-array">function.in-array</a>]: Wrong datatype for second argument 023f9b8372c8aac0845d74e87bded32a.php 第 22 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [2] in_array() [<a href="http://admin.jia/Product/function.in-array">function.in-array</a>]: Wrong datatype for second argument 023f9b8372c8aac0845d74e87bded32a.php 第 22 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [2] in_array() [<a href="http://admin.jia/Product/function.in-array">function.in-array</a>]: Wrong datatype for second argument 023f9b8372c8aac0845d74e87bded32a.php 第 22 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [2] in_array() [<a href="http://admin.jia/Product/function.in-array">function.in-array</a>]: Wrong datatype for second argument 023f9b8372c8aac0845d74e87bded32a.php 第 24 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [2] in_array() [<a href="http://admin.jia/Product/function.in-array">function.in-array</a>]: Wrong datatype for second argument 023f9b8372c8aac0845d74e87bded32a.php 第 24 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [2] in_array() [<a href="http://admin.jia/Product/function.in-array">function.in-array</a>]: Wrong datatype for second argument 023f9b8372c8aac0845d74e87bded32a.php 第 24 行.
+<br>[ 2013-10-15T16:29:24+08:00 ] NOTIC: [8] Undefined index:  e_name 023f9b8372c8aac0845d74e87bded32a.php 第 51 行.
+<br>加载文件 : 34<br>    [0] =&gt; E:\xampp\htdocs\company\yowuadmin\index.php<br>    [1] =&gt; E:\xampp\htdocs\company\yowuadmin\define.inc.php<br>    [2] =&gt; E:\xampp\htdocs\company\ThinkPHP2\ThinkPHP.php<br>    [3] =&gt; E:\xampp\htdocs\company\yowuadmin\Runtime\~runtime.php<br>    [4] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Common\convention.php<br>    [5] =&gt; E:\xampp\htdocs\company\yowuadmin\Conf\config.php<br>    [6] =&gt; E:\xampp\htdocs\company\yowuadmin\Common\common.php<br>    [7] =&gt; E:\xampp\htdocs\company\baseYowu\Common\common.php<br>    [8] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Common\debug.php<br>    [9] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Util\Dispatcher.class.php<br>    [10] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lang\zh-cn.php<br>    [11] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Util\HtmlCache.class.php<br>    [12] =&gt; E:\xampp\htdocs\company\yowuadmin\Lib\Action\ProductAction.class.php<br>    [13] =&gt; E:\xampp\htdocs\company\yowuadmin\Lib\Action\BaseAction.class.php<br>    [14] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Util\Cache.class.php<br>    [15] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Util\Cache\CacheMemcache.class.php<br>    [16] =&gt; E:\xampp\htdocs\company\yowuadmin\Lib\ORG\RBAC.class.php<br>    [17] =&gt; E:\xampp\htdocs\company\yowuadmin\Lib\Model\ProductModel.class.php<br>    [18] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Core\Model.class.php<br>    [19] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Db\Db.class.php<br>    [20] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Db\Driver\DbMysql.class.php<br>    [21] =&gt; E:\xampp\htdocs\company\yowuadmin\Lib\Model\SongpaiModel.class.php<br>    [22] =&gt; E:\xampp\htdocs\company\yowuadmin\Lib\Model\MeiciModel.class.php<br>    [23] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Core\Model\AdvModel.class.php<br>    [24] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Common\extend.php<br>    [25] =&gt; E:\xampp\htdocs\company\yowuadmin\dd_size_sort.php<br>    [26] =&gt; E:\xampp\htdocs\company\yowuadmin\Runtime\Cache\1b25191342c231947c82e6eee818f41d.php<br>    [27] =&gt; E:\xampp\htdocs\company\yowuadmin\Lib\Model\LendFormModel.class.php<br>    [28] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Util\Template\TemplateThink.class.php<br>    [29] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Template\ThinkTemplate.class.php<br>    [30] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Template\TagLib\TagLibCx.class.php<br>    [31] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Template\TagLib.class.php<br>    [32] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Template\TagLib\TagLibHtml.class.php<br>    [33] =&gt; E:\xampp\htdocs\company\yowuadmin\Runtime\Cache\023f9b8372c8aac0845d74e87bded32a.php<br><br></div>
+</fieldset>
+</div></div>
+    <div class="step1" style="margin-top: 10px; margin-left: 20px; display: none;">
+             <button onclick="return subProductInfo('1');">保存，下一步</button> <button onclick="return subProductInfo('2');" style=" margin-left:5px;">保存，继续添加</button>
+    </div>
+       
+</div>
+
+<div class="ac_box" id="bc02" style="z-index:99;">
+    <div class="relative">
+        <div class="absolute"><a href="javascript:void(0);" class="close_btn"><img src="%E5%86%85%E9%83%A8%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F-YOWU_files/pic_close_btn.gif"></a></div>
+    </div>
+    <h3><span class="float_l">录入选项介绍</span></h3>
+    <div class="ac_content">
+        <p>原厂货号：品牌用来标记不同商品用的商品货号，全球统一<br>商家自编号：店家用来标记不同商品用的自行定义的号码<br>尺码：请填写商品原码数据，如果商品是欧美版，则填欧美当地尺码<br>数量：填写可售卖的商品数量<br>搜索尺码需要增加说明提醒：<br>YOWU网站所采用的是国际标准尺码的检索规则，所以需要在此将商品原码和YOWU上的尺码做对应</p>
+	</div>
+</div>
+
+<script>
+function changeCate(val){
+    $('#subCate').html('');
+    $('#subJiesuan').html('');
+	$('#jiesuan').css('display', 'none');
+	$("#secondCate option[value!='']").remove();
+    _msgalertshow();
+    $.getJSON(_app+'/Base/getSubCate4Json/', { categoryId:val } ,function(ret) {
+		_msgalerthide();
+        for(var k in ret){
+			$("#secondCate").append('<option value="' + k + '">' + ret[k] + '</option>');
+        }
+    });
+	editMeasures(val);
+}
+function changeSecondCate(val){
+    $('#subCate').html('');
+    $('#subJiesuan').html('');
+    if(val == '') return false;
+    var html = '';
+    var jie = '';
+    _msgalertshow();
+    $.getJSON(_app+'/Base/getSubCate4Json/', { categoryId:val } ,function(ret) {
+		_msgalerthide();
+		if(ret == '') {
+			html += '<input type="checkbox" class="checkbox" id="ck_'+val+'" value="'+val+'" checked="checked" /><span class="lable"><label for="ck_'+val+'">' + $("#secondCate").find("option:selected").text() + '</label></span>';
+			jie += '<input type="radio" class="radio" id="rd_'+val+'" name="jiesuan" value="'+val+'" checked="checked" /><span class="lable"><label for="rd_'+val+'">' + $("#secondCate").find("option:selected").text() + '</label></span>';
+		} else {
+			for(var k in ret){
+				html += '<input type="checkbox" class="checkbox" id="ck_'+k+'" value="'+k+'" onclick="getJiesuan(' + k + ');" /><span class="lable"><label for="ck_'+k+'">'+ret[k]+'</label></span>';
+				jie += '<input type="radio" class="radio" id="rd_'+k+'" name="jiesuan" value="'+k+'" onclick="getJiesuan(' + k + ');" /><span class="lable"><label for="rd_'+k+'">'+ret[k]+'</label></span>';
+			}
+		}
+        $('#subCate').html(html);
+        $('#subJiesuan').html(jie);
+		//$('#jiesuan').css('display', '');
+    });
+}
+//如果分类选择超过二个，则需选定结算分类
+function getJiesuan(val){
+	if(val == '') return false;
+	if($("#ck_" + val).attr('checked') == true) {
+		$("#rd_" + val).attr('checked', true);
+	} else $("#rd_" + val).attr('checked', false);
+}
+
+//编辑尽码信息
+function editMeasures(val) {
+    _msgalertshow();
+    $.get(_url+'/editMeasures', { category_id : val } ,function(ret) {
+        _msgalerthide();
+		$('#setMeasure').html(ret);
+    });
+}
+
+//保存商品基本数据
+function subProductInfo(type) {
+	var Post = {
+		item_number	: $('#item_number').val(),
+		price		: Number($('#price').val()),
+		product_code: $('#product_code').val(),
+		supplier_id	: $('#supplier_id').val(),
+		brand_id	: $('#brand_id').val(),
+		category_id	: $('#category_id').val(),
+		color		: $('#color').val(),
+		fit_person	: $('#fit_person').val()
+    };
+    if(isEmpty(Post.item_number)) {
+        msgBoxText('请填写原厂货号',2,null);
+        return false;
+    }
+	if($('#price').val() == '') {
+		msgBoxText('请输入商品销售价格', 2, null);
+		return false;
+	} else if(isNaN(Post.price) || Post.price < 500) {
+        msgBoxText('暂无法销售500元以内的商品',2,null);
+        return false;
+    }
+	if(isEmpty(Post.supplier_id)) {
+        msgBoxText('请选择商家',2,null);
+        return false;
+    }
+	if(isEmpty(Post.brand_id)) {
+        msgBoxText('请选择品牌',2,null);
+        return false;
+    }
+    if(isEmpty(Post.category_id)) {
+        msgBoxText('请选择分类',2,null);
+        return false;
+    }
+    var subCategory = '';
+	//生成分类
+	$('#subCate').find('input:checkbox').each(function() {
+		if($(this).attr('checked')) subCategory += ',' + $(this).val();
+	});
+	if(subCategory == '') {
+        msgBoxText('请选择商品小类',2,null);
+        return false;
+	} else Post.subCategory = subCategory;	//商品小类
+	var jiesuan = $('#subJiesuan').find("input[type='radio']:checked").val();
+	if(jiesuan == undefined) {
+		//msgBoxText('请选择结算的分类！',2,null);
+		//return false;
+	} else Post.jiesuan = jiesuan;	//结算分类
+    if(isEmpty(Post.color)) {
+        msgBoxText('请选择适商品颜色',2,null);
+        return false;
+    }
+    if(isEmpty(Post.fit_person)) {
+        msgBoxText('请选择适合性别',2,null);
+        return false;
+    }
+	var quantitys = formatSize();
+	if(quantitys.match(/\w*\#\w*\#\w*\#0\|/)) {
+        msgBoxText('请设置正确的尺码及数量',2,null);
+        return false;
+	} else Post.quantitys = quantitys;	//尺码数据
+	_msgalertshow();
+    $.post(_url+'/setProduct',Post,function(ret){
+		_msgalerthide();
+		var str = eval('(' + ret + ')');
+        ret = parseInt(str.ret);
+		if(ret == 1) {
+			$('#product_id').attr('val', str.product_id);
+			if(type == 1) {
+				editProduct($('#product_id').attr('val'));
+				$('.step1').css('display', 'none');
+				$('.step2').css('display', '');
+			} else location.reload();
+			return false;
+		} else {
+			switch(ret) {
+				case 0:
+					msgBoxText('处理失败', 2, null);
+					return false;
+					break;
+				case -1:
+					msgBoxText('商品重复，重复sku号为' + str.sku, 2, null);
+					return false;
+					break;
+				case -11:
+					msgBoxText('原场货号为空',2,null);
+					return false;
+					break;
+				case -12:
+					msgBoxText('商家为空',2,null);
+					return false;
+					break;
+				case -13:
+					msgBoxText('适合性别为空',2,null);
+					return false;
+					break;
+				case -16:
+					msgBoxText('品牌为空',2,null);
+					return false;
+					break;
+				case -17:
+					msgBoxText('分类为空',2,null);
+					return false;
+					break;
+				case -18:
+					msgBoxText('颜色为空',2,null);
+					return false;
+					break;
+				default:
+					msgBoxText('发生未知错误',2,null);
+					return false;
+			}
+		}
+    });
+}
+
+// 得到商品信息
+function editProduct(id){
+    _msgalertshow();
+    $.get(_url + '/lstOneInfo', { id : id, type : 3 }, function(ret) {
+        _msgalerthide();
+        //$('#edit_sku').text(id);
+        $('#product_id').html(ret);
+    });
+}
+
+changeCate($('#category_id').val());
+editMeasures($('#category_id').val());
+</script>
+<!--底部开始-->
+<div id="footer" class="container">
+    <p>Copyright@2012-2013 优物网 | YOWU, 上海美昔电子商务有限公司. All right Reserved</p>
+</div>
+<!--底部结束-->
+
+<div id="think_run_time" class="think_run_time">Process: 0.114s ( 
+Load:0.006s Init:0.011s Exec:0.096s Template:0.000s ) | DB :20 queries 0
+ writes  | Cache :0 gets 0 writes  | UseMem:3,000 kb</div><div id="think_page_trace" style="background:white;margin:6px;font-size:14px;border:1px dashed silver;padding:8px">
+<fieldset id="querybox" style="margin:5px;">
+<legend style="color:gray;font-weight:bold">页面Trace信息</legend>
+<div style="overflow:auto;height:300px;text-align:left;">
+当前页面 : /Product/editProduct<br>模板缓存 : ./Runtime/Cache/f354a50ab646111cd5e8414382f7f17f.php<br>请求方法 : GET<br>通信协议 : HTTP/1.1<br>请求时间 : 2013-10-15 16:29:13<br>用户代理 : Mozilla/5.0 (Windows NT 6.1; rv:23.0) Gecko/20100101 Firefox/23.0<br>会话ID : b5d4f9eeac05de2371d689993af405b6<br>日志记录 : 21条日志<br>[ 2013-10-15T16:29:13+08:00 ] SQL: SHOW COLUMNS FROM product_info [ RunTime:0.002619s ]
+<br>[ 2013-10-15T16:29:13+08:00 ] SQL: SHOW COLUMNS FROM product_sales [ RunTime:0.001943s ]
+<br>[ 2013-10-15T16:29:13+08:00 ] SQL: SHOW COLUMNS FROM product_quantity [ RunTime:0.001747s ]
+<br>[ 2013-10-15T16:29:13+08:00 ] SQL: SHOW COLUMNS FROM product_category [ RunTime:0.001732s ]
+<br>[ 2013-10-15T16:29:13+08:00 ] SQL: SHOW COLUMNS FROM product_goods [ RunTime:0.001837s ]
+<br>[ 2013-10-15T16:29:13+08:00 ] SQL: SHOW COLUMNS FROM product_schedule [ RunTime:0.001820s ]
+<br>[ 2013-10-15T16:29:13+08:00 ] SQL: SHOW COLUMNS FROM product_schedule_goods [ RunTime:0.001536s ]
+<br>[ 2013-10-15T16:29:13+08:00 ] SQL: SHOW COLUMNS FROM dd_product_style [ RunTime:0.001815s ]
+<br>[ 2013-10-15T16:29:13+08:00 ] SQL: SHOW COLUMNS FROM product [ RunTime:0.001707s ]
+<br>[ 2013-10-15T16:29:13+08:00 ] SQL: SHOW COLUMNS FROM songpai [ RunTime:0.002654s ]
+<br>[ 2013-10-15T16:29:13+08:00 ] SQL: SHOW COLUMNS FROM songpai_product [ RunTime:0.003130s ]
+<br>[ 2013-10-15T16:29:13+08:00 ] SQL: SHOW COLUMNS FROM songpai_remark [ RunTime:0.002804s ]
+<br>[ 2013-10-15T16:29:13+08:00 ] SQL: SHOW COLUMNS FROM songpai [ RunTime:0.002537s ]
+<br>[ 2013-10-15T16:29:13+08:00 ] SQL: SHOW COLUMNS FROM purchase_detail [ RunTime:0.001754s ]
+<br>[ 2013-10-15T16:29:13+08:00 ] SQL: SHOW COLUMNS FROM arrival_notice [ RunTime:0.002095s ]
+<br>[ 2013-10-15T16:29:13+08:00 ] SQL: SHOW COLUMNS FROM meici [ RunTime:0.001761s ]
+<br>[ 2013-10-15T16:29:13+08:00 ] NOTIC: [8] Undefined index:  supplier_group_id ProductAction.class.php 第 263 行.
+<br>[ 2013-10-15T16:29:13+08:00 ] SQL: SHOW COLUMNS FROM supplier [ RunTime:0.002500s ]
+<br>[ 2013-10-15T16:29:13+08:00 ] SQL: SELECT `brand` FROM `supplier` WHERE id =  LIMIT 1  [ RunTime:0.000315s ]
+<br>[ 2013-10-15T16:29:13+08:00 ] SQL: SHOW COLUMNS FROM brand [ RunTime:0.002012s ]
+<br>[ 2013-10-15T16:29:13+08:00 ] SQL: SELECT id, ename FROM `brand` [ RunTime:0.000401s ]
+<br>加载文件 : 29<br>    [0] =&gt; E:\xampp\htdocs\company\yowuadmin\index.php<br>    [1] =&gt; E:\xampp\htdocs\company\yowuadmin\define.inc.php<br>    [2] =&gt; E:\xampp\htdocs\company\ThinkPHP2\ThinkPHP.php<br>    [3] =&gt; E:\xampp\htdocs\company\yowuadmin\Runtime\~runtime.php<br>    [4] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Common\convention.php<br>    [5] =&gt; E:\xampp\htdocs\company\yowuadmin\Conf\config.php<br>    [6] =&gt; E:\xampp\htdocs\company\yowuadmin\Common\common.php<br>    [7] =&gt; E:\xampp\htdocs\company\baseYowu\Common\common.php<br>    [8] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Common\debug.php<br>    [9] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Util\Dispatcher.class.php<br>    [10] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lang\zh-cn.php<br>    [11] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Util\HtmlCache.class.php<br>    [12] =&gt; E:\xampp\htdocs\company\yowuadmin\Lib\Action\ProductAction.class.php<br>    [13] =&gt; E:\xampp\htdocs\company\yowuadmin\Lib\Action\BaseAction.class.php<br>    [14] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Util\Cache.class.php<br>    [15] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Util\Cache\CacheMemcache.class.php<br>    [16] =&gt; E:\xampp\htdocs\company\yowuadmin\Lib\ORG\RBAC.class.php<br>    [17] =&gt; E:\xampp\htdocs\company\yowuadmin\Lib\Model\ProductModel.class.php<br>    [18] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Core\Model.class.php<br>    [19] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Db\Db.class.php<br>    [20] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Db\Driver\DbMysql.class.php<br>    [21] =&gt; E:\xampp\htdocs\company\yowuadmin\Lib\Model\SongpaiModel.class.php<br>    [22] =&gt; E:\xampp\htdocs\company\yowuadmin\Lib\Model\MeiciModel.class.php<br>    [23] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Lib\Think\Core\Model\AdvModel.class.php<br>    [24] =&gt; E:\xampp\htdocs\company\ThinkPHP2\Common\extend.php<br>    [25] =&gt; E:\xampp\htdocs\company\yowuadmin\Runtime\Cache\697ec4bed6844bf1ae618a7e7fb8f11d.php<br>    [26] =&gt; E:\xampp\htdocs\company\yowuadmin\Runtime\Cache\8558a0ec44eef6d274fa5863dbf3c473.php<br>    [27] =&gt; E:\xampp\htdocs\company\yowuadmin\Runtime\Cache\36f592a124bad5d63be2b1ca63177ffa.php<br>    [28] =&gt; E:\xampp\htdocs\company\yowuadmin\Runtime\Cache\f354a50ab646111cd5e8414382f7f17f.php<br><br></div>
+</fieldset>
+</div><div style="position: absolute; top: -1970px; left: -1970px;" id="_my97DP"><iframe style="width: 186px; height: 198px;" src="%E5%86%85%E9%83%A8%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F-YOWU_files/My97DatePicker.htm" border="0" frameborder="0" scrolling="no"></iframe></div></body></html>
